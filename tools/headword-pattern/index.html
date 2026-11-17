@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Search Latin dictionary headwords using wildcard patterns (*, ?, V=vowel, C=consonant) or regular expressions."
+    />
+    <title>Latin Headword Pattern Search — Morcus Labs</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #18181b;
+        --muted: #52525b;
+        --card: #f4f4f5;
+        --border: #d4d4d8;
+        --accent: #2563eb;
+        --accent-fg: #ffffff;
+        --badge-bg: #e4e4e7;
+        --err: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --fg: #f1f5f9;
+          --muted: #94a3b8;
+          --card: #1e293b;
+          --border: #334155;
+          --accent: #60a5fa;
+          --accent-fg: #0f172a;
+          --badge-bg: #334155;
+          --err: #f87171;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 820px;
+        padding: 20px 16px 48px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+      }
+      a {
+        color: var(--accent);
+      }
+      h1 {
+        margin: 8px 0 4px;
+        font-size: 1.5rem;
+      }
+      .subtitle {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .query-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      input[type="text"],
+      input[type="number"],
+      select {
+        padding: 9px 11px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      #query {
+        flex: 1 1 240px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+      }
+      .options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 12px;
+        font-size: 0.9rem;
+        align-items: center;
+      }
+      .options label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+      }
+      .len-inputs {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .len-inputs input {
+        width: 68px;
+        padding: 4px 7px;
+        font-size: 0.9rem;
+      }
+      .help {
+        margin-top: 10px;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .help code {
+        background: var(--badge-bg);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .examples {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+      button {
+        padding: 6px 11px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button.chip {
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+      }
+      .status-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 14px 0 8px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .error {
+        color: var(--err);
+        font-weight: 600;
+      }
+      ul.results {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      ul.results:empty {
+        display: none;
+      }
+      ul.results li {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      ul.results li:last-child {
+        border-bottom: none;
+      }
+      .hw-main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        align-items: baseline;
+      }
+      .hw-main a {
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .hw-main a:hover {
+        text-decoration: underline;
+      }
+      .orths {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .dicts {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: var(--badge-bg);
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .more-wrap {
+        margin-top: 12px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <nav><a href="../../">&larr; Morcus Labs</a></nav>
+    <h1>Latin Headword Pattern Search</h1>
+    <p class="subtitle">
+      Client-side wildcard &amp; regex search across Latin dictionary headwords
+      (Lewis &amp; Short, Gaffiot, Gesner, Forcellini).
+    </p>
+
+    <section class="panel">
+      <div class="query-row">
+        <input
+          id="query"
+          type="text"
+          placeholder="e.g. *nniV*"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+        />
+        <select id="mode" aria-label="Search mode">
+          <option value="pattern">Pattern (*, ?, V, C)</option>
+          <option value="regex">RegExp</option>
+        </select>
+      </div>
+
+      <div class="options">
+        <label><input type="checkbox" name="dict" value="ls" checked /> L&amp;S</label>
+        <label><input type="checkbox" name="dict" value="gaf" checked /> Gaffiot</label>
+        <label><input type="checkbox" name="dict" value="ges" checked /> Gesner</label>
+        <label><input type="checkbox" name="dict" value="for" checked /> Forcellini</label>
+        <label title="Search diacritic/macronized forms instead of normalized ASCII">
+          <input type="checkbox" id="macrons" /> Search macrons
+        </label>
+        <label title="Treat u/v and i/j as interchangeable">
+          <input type="checkbox" id="uvij" /> Equate u=v, i=j
+        </label>
+        <span class="len-inputs">
+          Length:
+          <input id="minLen" type="number" min="1" placeholder="min" aria-label="Min length" />
+          &ndash;
+          <input id="maxLen" type="number" min="1" placeholder="max" aria-label="Max length" />
+        </span>
+      </div>
+
+      <div class="help">
+        In <strong>Pattern</strong> mode, matches the whole headword:
+        <code>*</code> = any characters, <code>?</code> = 1 character,
+        <code>V</code> = vowel (<code>aeiouy</code>),
+        <code>C</code> = consonant. Lowercase letters match literally.
+      </div>
+
+      <div class="examples">
+        <span>Try:</span>
+        <button type="button" class="chip" data-q="*nniV*" data-mode="pattern">*nniV*</button>
+        <button type="button" class="chip" data-q="CVCVC" data-mode="pattern">CVCVC</button>
+        <button type="button" class="chip" data-q="*trix" data-mode="pattern">*trix</button>
+        <button type="button" class="chip" data-q="^sub.*io$" data-mode="regex">^sub.*io$</button>
+      </div>
+    </section>
+
+    <div class="status-bar">
+      <span id="status">Loading headword index&hellip;</span>
+      <div>
+        <button id="copy-btn" type="button" disabled>Copy matches</button>
+      </div>
+    </div>
+
+    <ul id="results" class="results"></ul>
+    <div id="more-wrap" class="more-wrap" hidden>
+      <button id="more-btn" type="button">Show more</button>
+    </div>
+
+    <script>
+      (function () {
+        const DATA_URL = "../../data/latin-headwords.tsv";
+        const PAGE_SIZE = 300;
+        const VOWEL_CLASS = "[aeiouy]";
+        const VOWEL_MACRON_CLASS = "[aeiouy\u0101\u0113\u012b\u014d\u016b\u0233\u0103\u0115\u012d\u014f\u016d]";
+        const CONS_CLASS = "[bcdfghjklmnpqrstvwxz]";
+
+        const queryEl = document.getElementById("query");
+        const modeEl = document.getElementById("mode");
+        const macronsEl = document.getElementById("macrons");
+        const uvijEl = document.getElementById("uvij");
+        const minLenEl = document.getElementById("minLen");
+        const maxLenEl = document.getElementById("maxLen");
+        const dictChecks = Array.from(document.querySelectorAll('input[name="dict"]'));
+        const statusEl = document.getElementById("status");
+        const resultsEl = document.getElementById("results");
+        const copyBtn = document.getElementById("copy-btn");
+        const moreWrap = document.getElementById("more-wrap");
+        const moreBtn = document.getElementById("more-btn");
+
+        /** @type {{ clean: string, uv: string, orths: string[], dicts: string[], dictSet: Set<string> }[]} */
+        let entries = [];
+        let lastMatches = [];
+        let renderedCount = 0;
+
+        function normalizeUvIj(s) {
+          return s.replace(/v/g, "u").replace(/j/g, "i");
+        }
+
+        function escapeRegExpChar(ch) {
+          return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function buildRegex(raw, mode, useMacrons, equateUvIj) {
+          if (!raw) return null;
+          if (mode === "regex") {
+            const pattern = equateUvIj ? normalizeUvIj(raw) : raw;
+            return new RegExp(pattern, useMacrons ? "" : "i");
+          }
+          const vowelPat = useMacrons ? VOWEL_MACRON_CLASS : VOWEL_CLASS;
+          let out = "^";
+          for (const ch of raw) {
+            if (ch === "*") out += ".*";
+            else if (ch === "?") out += ".";
+            else if (ch === "V") out += vowelPat;
+            else if (ch === "C") out += CONS_CLASS;
+            else if (equateUvIj && (ch === "u" || ch === "v")) out += "u";
+            else if (equateUvIj && (ch === "i" || ch === "j")) out += "i";
+            else out += escapeRegExpChar(ch);
+          }
+          out += "$";
+          return new RegExp(out, useMacrons ? "" : "i");
+        }
+
+        function syncUrl() {
+          const params = new URLSearchParams();
+          if (queryEl.value) params.set("q", queryEl.value);
+          if (modeEl.value !== "pattern") params.set("mode", modeEl.value);
+          if (macronsEl.checked) params.set("macrons", "1");
+          if (uvijEl.checked) params.set("uvij", "1");
+          if (minLenEl.value) params.set("min", minLenEl.value);
+          if (maxLenEl.value) params.set("max", maxLenEl.value);
+          const qs = params.toString();
+          const next = qs ? `${location.pathname}?${qs}` : location.pathname;
+          history.replaceState(null, "", next);
+        }
+
+        function loadFromUrl() {
+          const params = new URLSearchParams(location.search);
+          queryEl.value = params.get("q") ?? "*nniV*";
+          if (params.get("mode") === "regex") modeEl.value = "regex";
+          macronsEl.checked = params.get("macrons") === "1";
+          uvijEl.checked = params.get("uvij") === "1";
+          if (params.get("min")) minLenEl.value = params.get("min");
+          if (params.get("max")) maxLenEl.value = params.get("max");
+        }
+
+        function renderChunk(reset) {
+          if (reset) {
+            resultsEl.innerHTML = "";
+            renderedCount = 0;
+          }
+          const end = Math.min(lastMatches.length, renderedCount + PAGE_SIZE);
+          const frag = document.createDocumentFragment();
+          for (let i = renderedCount; i < end; i++) {
+            const item = lastMatches[i];
+            const li = document.createElement("li");
+
+            const left = document.createElement("div");
+            left.className = "hw-main";
+
+            const link = document.createElement("a");
+            link.href = `https://www.morcus.net/dicts?q=${encodeURIComponent(item.clean)}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.textContent = item.clean;
+            left.appendChild(link);
+
+            if (item.orths.length > 0) {
+              const span = document.createElement("span");
+              span.className = "orths";
+              span.textContent = item.orths.join(", ");
+              left.appendChild(span);
+            }
+
+            const right = document.createElement("div");
+            right.className = "dicts";
+            for (const d of item.dicts) {
+              const b = document.createElement("span");
+              b.className = "badge";
+              b.textContent = d;
+              right.appendChild(b);
+            }
+
+            li.appendChild(left);
+            li.appendChild(right);
+            frag.appendChild(li);
+          }
+          resultsEl.appendChild(frag);
+          renderedCount = end;
+          moreWrap.hidden = renderedCount >= lastMatches.length;
+          if (!moreWrap.hidden) {
+            moreBtn.textContent = `Show ${Math.min(PAGE_SIZE, lastMatches.length - renderedCount)} more (${lastMatches.length - renderedCount} remaining)`;
+          }
+        }
+
+        function runSearch() {
+          syncUrl();
+          if (entries.length === 0) return;
+
+          const raw = queryEl.value.trim();
+          const activeDicts = dictChecks.filter((c) => c.checked).map((c) => c.value);
+          const minLen = minLenEl.value ? Number(minLenEl.value) : 0;
+          const maxLen = maxLenEl.value ? Number(maxLenEl.value) : Infinity;
+          const useMacrons = macronsEl.checked;
+          const equateUvIj = uvijEl.checked;
+
+          if (!raw) {
+            lastMatches = [];
+            resultsEl.innerHTML = "";
+            moreWrap.hidden = true;
+            copyBtn.disabled = true;
+            statusEl.className = "";
+            statusEl.textContent = `Loaded ${entries.length.toLocaleString()} headwords. Enter a pattern above.`;
+            return;
+          }
+
+          let re;
+          try {
+            re = buildRegex(raw, modeEl.value, useMacrons, equateUvIj);
+          } catch (err) {
+            lastMatches = [];
+            resultsEl.innerHTML = "";
+            moreWrap.hidden = true;
+            copyBtn.disabled = true;
+            statusEl.className = "error";
+            statusEl.textContent = `Invalid pattern: ${err.message}`;
+            return;
+          }
+
+          const t0 = performance.now();
+          const matches = [];
+          for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e.clean.length < minLen || e.clean.length > maxLen) continue;
+            let dictOk = false;
+            for (let j = 0; j < activeDicts.length; j++) {
+              if (e.dictSet.has(activeDicts[j])) {
+                dictOk = true;
+                break;
+              }
+            }
+            if (!dictOk) continue;
+
+            if (useMacrons) {
+              const pool = e.orths.length > 0 ? e.orths : [e.clean];
+              let hit = false;
+              for (const o of pool) {
+                const candidate = equateUvIj ? normalizeUvIj(o) : o;
+                if (re.test(candidate)) {
+                  hit = true;
+                  break;
+                }
+              }
+              if (hit) matches.push(e);
+            } else {
+              const candidate = equateUvIj ? e.uv : e.clean;
+              if (re.test(candidate)) matches.push(e);
+            }
+          }
+          const ms = (performance.now() - t0).toFixed(1);
+
+          lastMatches = matches;
+          copyBtn.disabled = matches.length === 0;
+          statusEl.className = "";
+          statusEl.textContent = `${matches.length.toLocaleString()} match${matches.length === 1 ? "" : "es"} (${ms} ms)`;
+          renderChunk(true);
+        }
+
+        async function init() {
+          loadFromUrl();
+          try {
+            const res = await fetch(DATA_URL);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            const lines = text.trim().split("\n");
+            entries = lines.map((line) => {
+              const [clean, orthCol, dictCol] = line.split("\t");
+              const orths = orthCol ? orthCol.split("|") : [];
+              const dicts = dictCol ? dictCol.split(",") : [];
+              return {
+                clean,
+                uv: normalizeUvIj(clean),
+                orths,
+                dicts,
+                dictSet: new Set(dicts),
+              };
+            });
+            runSearch();
+          } catch (err) {
+            statusEl.className = "error";
+            statusEl.textContent = `Failed to load headword index: ${err.message}`;
+          }
+        }
+
+        queryEl.addEventListener("input", runSearch);
+        modeEl.addEventListener("change", runSearch);
+        macronsEl.addEventListener("change", runSearch);
+        uvijEl.addEventListener("change", runSearch);
+        minLenEl.addEventListener("input", runSearch);
+        maxLenEl.addEventListener("input", runSearch);
+        dictChecks.forEach((c) => c.addEventListener("change", runSearch));
+        moreBtn.addEventListener("click", () => renderChunk(false));
+
+        document.querySelectorAll(".chip").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            queryEl.value = btn.dataset.q || "";
+            modeEl.value = btn.dataset.mode || "pattern";
+            runSearch();
+          });
+        });
+
+        copyBtn.addEventListener("click", async () => {
+          const text = lastMatches.map((m) => m.clean).join("\n");
+          try {
+            await navigator.clipboard.writeText(text);
+            const prev = copyBtn.textContent;
+            copyBtn.textContent = `Copied ${lastMatches.length}`;
+            setTimeout(() => {
+              copyBtn.textContent = prev;
+            }, 1400);
+          } catch {
+            copyBtn.textContent = "Copy failed";
+          }
+        });
+
+        init();
+      })();
+    </script>
+  </body>
+</html>

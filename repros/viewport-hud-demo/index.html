@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Sample mobile repro page demonstrating visualViewport, dvh vs vh, and the on-screen debug HUD."
+    />
+    <title>Mobile Viewport &amp; HUD Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #18181b;
+        --card: #f4f4f5;
+        --border: #d4d4d8;
+        --accent: #2563eb;
+        --hud-bg: rgba(15, 23, 42, 0.92);
+        --hud-fg: #e2e8f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --fg: #f1f5f9;
+          --card: #1e293b;
+          --border: #334155;
+          --accent: #60a5fa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        padding-top: max(16px, env(safe-area-inset-top));
+        padding-bottom: max(80px, env(safe-area-inset-bottom));
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+      }
+      a {
+        color: var(--accent);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin: 14px 0;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .vh-probe {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 4px;
+        height: 100dvh;
+        background: rgba(37, 99, 235, 0.35);
+        pointer-events: none;
+      }
+
+      /* --- Debug HUD --- */
+      #hud-toggle {
+        position: fixed;
+        right: max(10px, env(safe-area-inset-right));
+        bottom: max(10px, env(safe-area-inset-bottom));
+        z-index: 99999;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid #475569;
+        background: var(--hud-bg);
+        color: var(--hud-fg);
+        font: 600 12px/1 ui-monospace, SFMono-Regular, monospace;
+        cursor: pointer;
+      }
+      #hud-panel {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(max(10px, env(safe-area-inset-bottom)) + 40px);
+        max-height: 45vh;
+        overflow: auto;
+        z-index: 99998;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #475569;
+        background: var(--hud-bg);
+        color: var(--hud-fg);
+        font: 12px/1.4 ui-monospace, SFMono-Regular, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #hud-panel[hidden] {
+        display: none;
+      }
+      #hud-metrics {
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #334155;
+        color: #93c5fd;
+      }
+      #hud-logs {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      #hud-logs li {
+        padding: 2px 0;
+        border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+      }
+      #hud-logs li.err {
+        color: #fca5a5;
+      }
+      #hud-logs li.warn {
+        color: #fde047;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="vh-probe" aria-hidden="true"></div>
+    <main>
+      <p><a href="../../">&larr; Morcus Labs</a></p>
+      <h1>Mobile Viewport &amp; HUD Demo</h1>
+      <p>
+        Starter repro page built from <code>_templates/mobile-repro.html</code>.
+        Tap <strong>HUD</strong> in the bottom-right corner to inspect live
+        viewport dimensions, keyboard resize events, and console logs on a
+        physical phone.
+      </p>
+
+      <div class="card">
+        <label for="kbd-input"><strong>Focus to test virtual keyboard resize:</strong></label>
+        <input id="kbd-input" type="text" placeholder="Tap here on mobile..." />
+      </div>
+
+      <div class="card">
+        <strong>Live readout:</strong>
+        <pre id="inline-readout" style="margin: 8px 0 0; overflow: auto"></pre>
+      </div>
+    </main>
+
+    <button id="hud-toggle" type="button">HUD</button>
+    <aside id="hud-panel">
+      <div id="hud-metrics"></div>
+      <ul id="hud-logs"></ul>
+    </aside>
+
+    <script>
+      (function () {
+        const toggle = document.getElementById("hud-toggle");
+        const panel = document.getElementById("hud-panel");
+        const metricsEl = document.getElementById("hud-metrics");
+        const logsEl = document.getElementById("hud-logs");
+        const readout = document.getElementById("inline-readout");
+
+        function updateMetrics() {
+          const vv = window.visualViewport;
+          const lines = [
+            `inner: ${window.innerWidth}x${window.innerHeight} | docEl: ${document.documentElement.clientWidth}x${document.documentElement.clientHeight}`,
+            vv
+              ? `visualViewport: ${Math.round(vv.width)}x${Math.round(vv.height)} offset=(${Math.round(vv.offsetLeft)}, ${Math.round(vv.offsetTop)}) scale=${vv.scale.toFixed(2)}`
+              : "visualViewport: n/a",
+            `scrollY: ${Math.round(window.scrollY)} | dpr: ${window.devicePixelRatio}`,
+            `ua: ${navigator.userAgent}`,
+          ];
+          metricsEl.textContent = lines.join("\n");
+          readout.textContent = lines.slice(0, 3).join("\n");
+        }
+
+        function appendLog(kind, args) {
+          const li = document.createElement("li");
+          if (kind !== "log") li.className = kind;
+          const time = new Date().toISOString().slice(11, 23);
+          const msg = Array.from(args)
+            .map((a) => {
+              if (typeof a === "string") return a;
+              try {
+                return JSON.stringify(a);
+              } catch {
+                return String(a);
+              }
+            })
+            .join(" ");
+          li.textContent = `[${time}] ${msg}`;
+          logsEl.appendChild(li);
+          panel.scrollTop = panel.scrollHeight;
+        }
+
+        for (const level of ["log", "warn", "error"]) {
+          const orig = console[level].bind(console);
+          console[level] = (...args) => {
+            orig(...args);
+            appendLog(level, args);
+          };
+        }
+
+        toggle.addEventListener("click", () => {
+          panel.hidden = !panel.hidden;
+          updateMetrics();
+        });
+        window.addEventListener("resize", () => {
+          updateMetrics();
+          console.log("window.resize", window.innerWidth + "x" + window.innerHeight);
+        }, { passive: true });
+        window.addEventListener("scroll", updateMetrics, { passive: true });
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", () => {
+            updateMetrics();
+            console.log("visualViewport.resize", Math.round(window.visualViewport.height));
+          }, { passive: true });
+          window.visualViewport.addEventListener("scroll", updateMetrics, { passive: true });
+        }
+        document.getElementById("kbd-input").addEventListener("focus", () => {
+          console.log("input focused");
+        });
+        updateMetrics();
+      })();
+    </script>
+  </body>
+</html>

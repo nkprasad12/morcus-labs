@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Morcus Labs</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #18181b;
+        --muted: #52525b;
+        --card: #f4f4f5;
+        --border: #d4d4d8;
+        --accent: #2563eb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --fg: #f1f5f9;
+          --muted: #94a3b8;
+          --card: #1e293b;
+          --border: #334155;
+          --accent: #60a5fa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 760px;
+        padding: 28px 16px 48px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.55;
+      }
+      a {
+        color: var(--accent);
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 1.75rem;
+      }
+      .subtitle {
+        margin: 0 0 24px;
+        color: var(--muted);
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 10px;
+      }
+      li a {
+        display: block;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+        text-decoration: none;
+        color: var(--fg);
+      }
+      li a:hover {
+        border-color: var(--accent);
+      }
+      .title {
+        font-weight: 600;
+        color: var(--accent);
+      }
+      .path {
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, monospace;
+      }
+      footer {
+        margin-top: 36px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Morcus Labs</h1>
+      <p class="subtitle">
+        Self-contained one-off tools and isolated UI bug repros. Each page is
+        independent and unmaintained outside its specific ask.
+      </p>
+    </header>
+
+    <section>
+      <h2>Tools</h2>
+      <ul id="tools-list"></ul>
+    </section>
+
+    <section>
+      <h2>UI Repros</h2>
+      <ul id="repros-list"></ul>
+    </section>
+
+    <footer>
+      <a href="https://www.morcus.net">Morcus.net</a> &middot;
+      <a href="https://github.com/nkprasad12/morcus-labs">GitHub repo</a>
+    </footer>
+
+    <script>
+      (function () {
+        const FALLBACK = [
+          "tools/headword-pattern/index.html",
+          "repros/viewport-hud-demo/index.html",
+        ];
+
+        function labelFromPath(path) {
+          const slug = path.split("/")[1] || path;
+          return slug
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+        }
+
+        function renderList(el, paths) {
+          el.innerHTML = "";
+          if (paths.length === 0) {
+            const li = document.createElement("li");
+            li.textContent = "None yet.";
+            el.appendChild(li);
+            return;
+          }
+          for (const path of paths.sort()) {
+            const href = path.replace(/index\.html$/, "");
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = href;
+
+            const title = document.createElement("div");
+            title.className = "title";
+            title.textContent = labelFromPath(path);
+
+            const sub = document.createElement("div");
+            sub.className = "path";
+            sub.textContent = href;
+
+            a.appendChild(title);
+            a.appendChild(sub);
+            li.appendChild(a);
+            el.appendChild(li);
+          }
+        }
+
+        function applyPaths(paths) {
+          const tools = paths.filter((p) => /^tools\/[^/]+\/index\.html$/.test(p));
+          const repros = paths.filter((p) => /^repros\/[^/]+\/index\.html$/.test(p));
+          renderList(document.getElementById("tools-list"), tools);
+          renderList(document.getElementById("repros-list"), repros);
+        }
+
+        applyPaths(FALLBACK);
+
+        fetch("https://api.github.com/repos/nkprasad12/morcus-labs/git/trees/main?recursive=1")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!data || !Array.isArray(data.tree)) return;
+            const paths = data.tree
+              .filter((node) => node.type === "blob")
+              .map((node) => node.path);
+            applyPaths(paths);
+          })
+          .catch(() => {});
+      })();
+    </script>
+  </body>
+</html>
